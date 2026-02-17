@@ -1,5 +1,5 @@
-from django.db.models import Count, Q
-from django.utils import timezone
+from django.db.models import Avg, Count, Q
+from django.db.models.functions import TruncDate
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -60,17 +60,15 @@ class TicketViewSet(viewsets.ModelViewSet):
         total_tickets = all_tickets.count()
         open_tickets = all_tickets.filter(status="open").count()
 
-        # Average tickets per day via DB aggregation
-        if total_tickets > 0:
-            first_ticket = all_tickets.order_by("created_at").values_list(
-                "created_at", flat=True
-            ).first()
-            days_since_first = max(
-                (timezone.now() - first_ticket).days, 1
-            )
-            avg_tickets_per_day = round(total_tickets / days_since_first, 1)
-        else:
-            avg_tickets_per_day = 0
+        # Average tickets per day via DB aggregation using TruncDate + Count + Avg
+        avg_result = (
+            all_tickets
+            .annotate(day=TruncDate("created_at"))
+            .values("day")
+            .annotate(daily_count=Count("id"))
+            .aggregate(avg_per_day=Avg("daily_count"))
+        )
+        avg_tickets_per_day = round(avg_result["avg_per_day"], 1) if avg_result["avg_per_day"] else 0
 
         # Priority breakdown via DB aggregation
         priority_counts = dict(
