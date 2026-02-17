@@ -1,7 +1,7 @@
 <div align="center">
 
-<!-- 🔹 BANNER — replace the src below with your own hosted banner image -->
-<!-- <img src="./banner.png" alt="Support Ticket System Banner" width="100%" /> -->
+<!--🔹 BANNER — replace the src below with your own hosted banner image -->
+<img src="./banner.png" alt="Support Ticket System Banner" width="100%" /> 
 
 # 🎫 Support Ticket System
 
