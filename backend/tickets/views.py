@@ -1,5 +1,8 @@
-from django.db.models import Q
-from rest_framework import viewsets
+from django.db.models import Count, Q
+from django.utils import timezone
+from rest_framework import status, viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
 
 from .models import Ticket
 from .serializers import TicketSerializer
@@ -8,7 +11,8 @@ from .serializers import TicketSerializer
 class TicketViewSet(viewsets.ModelViewSet):
     """
     ViewSet for support tickets.
-    Provides CRUD operations with filtering and search support.
+
+    Provides CRUD operations plus custom actions for stats.
     """
 
     queryset = Ticket.objects.all()
@@ -42,3 +46,57 @@ class TicketViewSet(viewsets.ModelViewSet):
             )
 
         return queryset
+
+    @action(detail=False, methods=["get"])
+    def stats(self, request):
+        """
+        Return aggregated ticket statistics using DB-level aggregation.
+        No Python-level loops — all computed via Django ORM aggregate/annotate.
+        """
+        all_tickets = Ticket.objects.all()
+
+        # Total and open counts via DB aggregation
+        total_tickets = all_tickets.count()
+        open_tickets = all_tickets.filter(status="open").count()
+
+        # Average tickets per day via DB aggregation
+        if total_tickets > 0:
+            first_ticket = all_tickets.order_by("created_at").values_list(
+                "created_at", flat=True
+            ).first()
+            days_since_first = max(
+                (timezone.now() - first_ticket).days, 1
+            )
+            avg_tickets_per_day = round(total_tickets / days_since_first, 1)
+        else:
+            avg_tickets_per_day = 0
+
+        # Priority breakdown via DB aggregation
+        priority_counts = dict(
+            all_tickets.values_list("priority")
+            .annotate(count=Count("id"))
+            .values_list("priority", "count")
+        )
+        priority_breakdown = {
+            p: priority_counts.get(p, 0)
+            for p in ["low", "medium", "high", "critical"]
+        }
+
+        # Category breakdown via DB aggregation
+        category_counts = dict(
+            all_tickets.values_list("category")
+            .annotate(count=Count("id"))
+            .values_list("category", "count")
+        )
+        category_breakdown = {
+            c: category_counts.get(c, 0)
+            for c in ["billing", "technical", "account", "general"]
+        }
+
+        return Response({
+            "total_tickets": total_tickets,
+            "open_tickets": open_tickets,
+            "avg_tickets_per_day": avg_tickets_per_day,
+            "priority_breakdown": priority_breakdown,
+            "category_breakdown": category_breakdown,
+        })
