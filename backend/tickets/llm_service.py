@@ -26,18 +26,25 @@ Respond with ONLY a JSON object in this exact format, no other text:
 Ticket description:
 """
 
+# Standard failure response — always returns the same shape
+FAILURE_RESPONSE = {
+    "suggested_category": None,
+    "suggested_priority": None,
+}
+
 
 def classify_ticket(description: str) -> dict:
     """
     Call OpenAI API to classify a ticket description into category and priority.
 
-    Returns a dict with 'suggested_category' and 'suggested_priority' on success,
-    or a dict with an 'error' key on failure.
+    Returns a dict with 'suggested_category' and 'suggested_priority'.
+    On success, values are valid category/priority strings.
+    On failure, values are None.
     """
     api_key = settings.OPENAI_API_KEY
     if not api_key:
         logger.warning("OpenAI API key not configured")
-        return {"error": "LLM service not configured"}
+        return {**FAILURE_RESPONSE, "error": "LLM service not configured"}
 
     try:
         client = OpenAI(api_key=api_key)
@@ -55,6 +62,7 @@ def classify_ticket(description: str) -> dict:
             ],
             temperature=0.1,
             max_tokens=50,
+            timeout=10,
         )
 
         content = response.choices[0].message.content.strip()
@@ -81,7 +89,8 @@ def classify_ticket(description: str) -> dict:
 
     except json.JSONDecodeError as e:
         logger.error(f"Failed to parse LLM response: {e}")
-        return {"error": "Failed to parse LLM response"}
+        return {**FAILURE_RESPONSE, "error": "Failed to parse LLM response"}
     except Exception as e:
         logger.error(f"LLM classification failed: {e}")
-        return {"error": "LLM service unavailable"}
+        return {**FAILURE_RESPONSE, "error": "LLM service unavailable"}
+

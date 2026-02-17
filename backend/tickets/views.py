@@ -104,15 +104,13 @@ class TicketViewSet(viewsets.ModelViewSet):
     def classify(self, request):
         """
         Send a description to the LLM and get suggested category + priority.
-        Gracefully handles LLM failures.
+        Always returns 200 with suggested_category and suggested_priority.
+        On failure, both values are null.
         """
         serializer = ClassifySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         description = serializer.validated_data["description"]
         result = classify_ticket(description)
-
-        if "error" in result:
-            return Response(result, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
         return Response(result, status=status.HTTP_200_OK)
