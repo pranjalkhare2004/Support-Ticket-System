@@ -2,7 +2,7 @@ import json
 import logging
 
 from django.conf import settings
-from openai import OpenAI
+import google.generativeai as genai
 
 logger = logging.getLogger(__name__)
 
@@ -35,37 +35,38 @@ FAILURE_RESPONSE = {
 
 def classify_ticket(description: str) -> dict:
     """
-    Call OpenAI API to classify a ticket description into category and priority.
+    Call Google Gemini API to classify a ticket description into category and priority.
 
     Returns a dict with 'suggested_category' and 'suggested_priority'.
     On success, values are valid category/priority strings.
     On failure, values are None.
     """
-    api_key = settings.OPENAI_API_KEY
+    api_key = settings.GEMINI_API_KEY
     if not api_key:
-        logger.warning("OpenAI API key not configured")
+        logger.warning("Gemini API key not configured")
         return {**FAILURE_RESPONSE, "error": "LLM service not configured"}
 
     try:
-        client = OpenAI(api_key=api_key)
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a support ticket classifier. Respond only with valid JSON.",
-                },
-                {
-                    "role": "user",
-                    "content": CLASSIFY_PROMPT + description,
-                },
-            ],
-            temperature=0.1,
-            max_tokens=50,
-            timeout=10,
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel("gemini-2.5-flash-lite")
+
+        response = model.generate_content(
+            CLASSIFY_PROMPT + description,
+            generation_config=genai.types.GenerationConfig(
+                temperature=0.1,
+                max_output_tokens=50,
+            ),
         )
 
-        content = response.choices[0].message.content.strip()
+        content = response.text.strip()
+
+        # Gemini often wraps JSON in markdown code blocks — strip them
+        if content.startswith("```"):
+            # Remove ```json or ``` prefix and trailing ```
+            lines = content.split("\n")
+            # Drop first line (```json) and last line (```)
+            lines = [l for l in lines if not l.strip().startswith("```")]
+            content = "\n".join(lines).strip()
 
         # Parse the JSON response
         result = json.loads(content)
@@ -93,4 +94,3 @@ def classify_ticket(description: str) -> dict:
     except Exception as e:
         logger.error(f"LLM classification failed: {e}")
         return {**FAILURE_RESPONSE, "error": "LLM service unavailable"}
-

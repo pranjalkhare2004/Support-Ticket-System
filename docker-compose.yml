@@ -22,7 +22,7 @@ services:
       - "8000:8000"
     environment:
       - DATABASE_URL=postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-tickets_db}
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - DJANGO_DEBUG=1
     depends_on:
       db:

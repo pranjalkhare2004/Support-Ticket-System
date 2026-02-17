@@ -88,5 +88,5 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": None,
 }
 
-# OpenAI API Key
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+# Gemini API Key
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
