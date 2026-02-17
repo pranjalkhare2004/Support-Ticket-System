@@ -4,15 +4,16 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from .llm_service import classify_ticket
 from .models import Ticket
-from .serializers import TicketSerializer
+from .serializers import ClassifySerializer, TicketSerializer
 
 
 class TicketViewSet(viewsets.ModelViewSet):
     """
     ViewSet for support tickets.
 
-    Provides CRUD operations plus custom actions for stats.
+    Provides CRUD operations plus custom actions for stats and classification.
     """
 
     queryset = Ticket.objects.all()
@@ -51,7 +52,7 @@ class TicketViewSet(viewsets.ModelViewSet):
     def stats(self, request):
         """
         Return aggregated ticket statistics using DB-level aggregation.
-        No Python-level loops — all computed via Django ORM aggregate/annotate.
+        No Python-level loops â€” all computed via Django ORM aggregate/annotate.
         """
         all_tickets = Ticket.objects.all()
 
@@ -100,3 +101,20 @@ class TicketViewSet(viewsets.ModelViewSet):
             "priority_breakdown": priority_breakdown,
             "category_breakdown": category_breakdown,
         })
+
+    @action(detail=False, methods=["post"])
+    def classify(self, request):
+        """
+        Send a description to the LLM and get suggested category + priority.
+        Gracefully handles LLM failures.
+        """
+        serializer = ClassifySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        description = serializer.validated_data["description"]
+        result = classify_ticket(description)
+
+        if "error" in result:
+            return Response(result, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        return Response(result, status=status.HTTP_200_OK)

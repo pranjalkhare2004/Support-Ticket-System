@@ -17,3 +17,9 @@ class TicketSerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = ["id", "created_at"]
+
+
+class ClassifySerializer(serializers.Serializer):
+    """Serializer for the LLM classify endpoint request."""
+
+    description = serializers.CharField(required=True, min_length=1)
