@@ -39,9 +39,16 @@ function TicketForm({ onTicketCreated }) {
     setAiSuggested(false);
     try {
       const response = await classifyTicket(desc);
-      setCategory(response.data.suggested_category);
-      setPriority(response.data.suggested_priority);
-      setAiSuggested(true);
+      const { suggested_category, suggested_priority } = response.data;
+
+      // Only prefill if LLM returned valid values (not null on failure)
+      if (suggested_category && suggested_priority) {
+        setCategory(suggested_category);
+        setPriority(suggested_priority);
+        setAiSuggested(true);
+      } else {
+        setClassifyError('AI classification unavailable — please select manually.');
+      }
     } catch (err) {
       setClassifyError('AI classification unavailable — please select manually.');
     } finally {
